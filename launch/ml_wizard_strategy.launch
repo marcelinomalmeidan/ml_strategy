@@ -10,9 +10,9 @@
                                "hermione",
                                "ron"] </rosparam>
 
-    <rosparam param="InitialPosition"> [-6.0,  1.5, 2.0,
-                                        -6.0,  0.0, 2.0,
-                                        -6.0, -1.5, 2.0] </rosparam>
+    <rosparam param="InitialPosition"> [-6.0,  0.0, 2.0,
+                                        -6.0, -1.5, 2.0,
+                                        -6.0,  1.5, 2.0] </rosparam>
 
   </node>
 
