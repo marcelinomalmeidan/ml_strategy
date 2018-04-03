@@ -21,7 +21,7 @@ void GameStateCallback(const mg_msgs::GameState::ConstPtr& msg) {
 int main(int argc, char** argv){
 	ros::init(argc, argv, "ml_strategy");
 	ros::NodeHandle node("~");
-  	ROS_INFO("Marcelino's ML Wizard strategy started!");
+  	ROS_INFO("Marcelino's strategy started!");
 
   	// Get team quads
 	std::vector<std::string> quad_names;
