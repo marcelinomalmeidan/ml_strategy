@@ -65,6 +65,7 @@ void TeamStrategy::AddQuad(const std::string &quad_name,
 		new_quad.reference.yaw = yaw_ref;
 		new_quad.init_pos = ref_pos;
 		new_quad.vehicle_odom = helper::GetZeroOdom();
+		new_quad.vehicle_odom.pose.pose.position = helper::Vec3d2point(ref_pos);
 		new_quad.role.State = role;
 		new_quad.reference_integrator = rk4(max_vel_, max_acc_, ref_pos);
 		new_quad.nh = *nh;
@@ -109,7 +110,7 @@ void TeamStrategy::UpdateQuadOdom(const std::string &name,
 
 void TeamStrategy::EnemyDangerUpdate() {
 	const double warning_threshold = 4.0;
-	const double danger_threshold = 2.5;
+	const double danger_threshold = 3.0;
 
 	std::set<EnemyData>::iterator it;
 	for(it = enemies_.begin(); it != enemies_.end(); ++it) {
@@ -337,7 +338,7 @@ mg_msgs::PVA TeamStrategy::GetRefRk4(const std::set<QuadData>::iterator &it,
 
 void TeamStrategy::OffensiveReturn(const std::set<QuadData>::iterator &it,
 	                               const double &dt) {
-	double kd = 2.0, kp = 3.0;
+	double kd = 2.0;
 
 	// Get current position/velocity of vehicle
 	Eigen::Vector3d pos = 
@@ -349,11 +350,12 @@ void TeamStrategy::OffensiveReturn(const std::set<QuadData>::iterator &it,
 	Eigen::Vector3d vec_quad2init_pos = (it->init_pos - pos);
 	
 	// Force leading towards initial position
-	if (vec_quad2init_pos.norm() > max_acc_/kp) {
-		Eigen::Vector3d ref_pos = it->init_pos;
+	if (vec_quad2init_pos.norm() > max_acc_/kd) {
+		// Eigen::Vector3d ref_pos = it->init_pos;
 		Eigen::Vector3d ref_vel = max_vel_*vec_quad2init_pos.normalized();
-		Eigen::Vector3d desired_acc = max_acc_*vec_quad2init_pos.normalized();
-		Eigen::Vector3d ref_acc = desired_acc + kd*(ref_vel - vel) + kp*(ref_pos - pos);
+		// Eigen::Vector3d desired_acc = max_acc_*vec_quad2init_pos.normalized();
+		Eigen::Vector3d ref_acc = kd*(ref_vel - vel);
+		it->reference_integrator.y_ = pos;
 		it->reference_integrator.UpdateStates(ref_acc, dt);
 	} else {
 		Eigen::Vector3d ref_pos = it->init_pos;
@@ -381,11 +383,12 @@ void TeamStrategy::OffensiveAdvance(const std::set<QuadData>::iterator &it,
 	
 	// Force leading towards enemy balloon plane
 	Eigen::Vector3d ref_vel = max_vel_*vec_quad2balloon_plane;
-	Eigen::Vector3d desired_acc = max_acc_*vec_quad2balloon_plane;
-	Eigen::Vector3d ref_acc = desired_acc + kd*(ref_vel - vel);
+	// Eigen::Vector3d desired_acc = max_acc_*vec_quad2balloon_plane;
+	Eigen::Vector3d ref_acc = kd*(ref_vel - vel);
 
 	// Set position reference as current, update rk4 based on
 	// velocity and acceleration only
+	it->reference_integrator.y_ = pos;
 	it->reference_integrator.UpdateStates(ref_acc, dt);
 
 	it->reference = this->GetRefRk4(it, dt);
@@ -400,15 +403,9 @@ void TeamStrategy::OffensiveBalloon(const std::set<QuadData>::iterator &it,
 		helper::Point2vec3d(it->vehicle_odom.pose.pose.position);
 	Eigen::Vector3d vel = 
 		helper::Vec32vec3d(it->vehicle_odom.twist.twist.linear);
-
-	// Vector from quad to enemy balloon
-	Eigen::Vector3d vec_quad2balloon = (enemy_balloon_ - pos).normalized();
 	
-	// Force leading towards enemy balloon plane
+	// Reference position: enemy balloon
 	Eigen::Vector3d ref_pos = enemy_balloon_;
-	// Eigen::Vector3d ref_vel = Eigen::Vector3d::Zero();
-	// Eigen::Vector3d desired_acc = Eigen::Vector3d::Zero();
-	// Eigen::Vector3d ref_acc = kd*(ref_vel - vel) + kp*(ref_pos - pos);
 
 	// Set rk4 reference to balloon
 	it->reference_integrator.ResetStates(ref_pos);
@@ -427,7 +424,7 @@ void TeamStrategy::DefensiveSteady(const std::set<QuadData>::iterator &it,
 
 void TeamStrategy::DefensiveTargeting(const std::set<QuadData>::iterator &it,
 	                                   const double &dt) {
-	double kd = 2.0, kp = 3.0;
+	double kd = 5.0, kp1 = 2.0;
 
 	// Find nearest point in balloon plane
 	Eigen::Vector3d pos = 
@@ -440,17 +437,36 @@ void TeamStrategy::DefensiveTargeting(const std::set<QuadData>::iterator &it,
 	FindEnemyIndex(it->role.DefenseState.target_name, &it_target);
 	Eigen::Vector3d pos_target = 
 		helper::Point2vec3d(it_target->vehicle_odom.pose.pose.position);
+	Eigen::Vector3d vel_target = 
+		helper::Vec32vec3d(it_target->vehicle_odom.twist.twist.linear);
 
-	// Vector from quad to enemy balloon plane
-	Eigen::Vector3d vec_quad2enemy = (pos_target - pos).normalized();
-	
-	// Force leading towards enemy balloon plane
-	Eigen::Vector3d ref_vel = max_vel_*vec_quad2enemy;
-	Eigen::Vector3d desired_acc = max_acc_*vec_quad2enemy;
-	Eigen::Vector3d ref_acc = desired_acc + kd*(ref_vel - vel) + kp*(pos_target - pos);
+	// Define plane with normal towards enemy base, and origin at defense line
+	Eigen::Vector3d init_pos = it->init_pos;
+	Plane3d defense_plane(init_pos, offensive_direction_);
+
+	// Project enemy position onto plane, finding position reference
+	Eigen::Vector3d pos_projection;  // Enemy projection onto plane
+	double dist;					 // Enemy distance to plane
+	defense_plane.ProjectPointOntoPlane(pos_target, &pos_projection, &dist);
+
+	// Project enemy velocity onto plane
+	Eigen::Vector3d vel_projection;
+	defense_plane.ProjectVectorOntoPlane(vel_target, &vel_projection);
+
+	// Reference position: plane "advance_dist" ahead of defense line
+	const double advance_dist = 1.0;
+	Eigen::Vector3d ref_pos = pos_projection + advance_dist*offensive_direction_;
+
+	// Reference velocity is sum of two terms:
+	// 1) enemy projection onto defense plane
+	// 2) enemy velocity projected onto plane
+	Eigen::Vector3d ref_vel_pos = kp1*(ref_pos - pos);
+	Eigen::Vector3d ref_vel = ref_vel_pos + vel_projection;
+	Eigen::Vector3d ref_acc = kd*(ref_vel - vel);
 
 	// Set position reference as current, update rk4 based on
-	// velocity and acceleration only
+	// velocity only
+	it->reference_integrator.y_ = ref_pos;
 	it->reference_integrator.UpdateStates(ref_acc, dt);
 
 	it->reference = this->GetRefRk4(it, dt);
@@ -471,10 +487,11 @@ void TeamStrategy::DefensiveReturn(const std::set<QuadData>::iterator &it,
 	
 	// Force leading towards initial position
 	if (vec_quad2init_pos.norm() > max_acc_/kp) {
-		Eigen::Vector3d ref_pos = it->init_pos;
+		// Eigen::Vector3d ref_pos = it->init_pos;
 		Eigen::Vector3d ref_vel = max_vel_*vec_quad2init_pos.normalized();
-		Eigen::Vector3d desired_acc = max_acc_*vec_quad2init_pos.normalized();
-		Eigen::Vector3d ref_acc = desired_acc + kd*(ref_vel - vel) + kp*(ref_pos - pos);
+		// Eigen::Vector3d desired_acc = max_acc_*vec_quad2init_pos.normalized();
+		Eigen::Vector3d ref_acc = kd*(ref_vel - vel);
+		it->reference_integrator.y_ = pos;
 		it->reference_integrator.UpdateStates(ref_acc, dt);
 	} else {
 		Eigen::Vector3d ref_pos = it->init_pos;

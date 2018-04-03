@@ -16,7 +16,7 @@ struct AttackStates{
 	uint ADVANCING = 1;  // Going towards opponent's team base
 	uint BALLOON = 2;    // Aiming the balloon
 
-	uint State = RETURNING;
+	uint State = ADVANCING;
 };
 
 // Defensive states

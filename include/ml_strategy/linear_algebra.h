@@ -130,6 +130,13 @@ class Plane3d{
         this->DistancePoint2Plane(point, dist);
         *nearest_point = point - (*dist)*normal_;
     }
+
+    // Projects vector onto plane (vector starts at origin)
+    void ProjectVectorOntoPlane(const Eigen::Vector3d &vector,
+                               Eigen::Vector3d *projection) {
+        const double dist =  vector.dot(normal_);
+        *projection = vector - dist*normal_;
+    }
 };
 
 #endif  // LINEAR_ALGEBRA_H_
