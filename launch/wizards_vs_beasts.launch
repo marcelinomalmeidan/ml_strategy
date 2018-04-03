@@ -24,7 +24,7 @@
 
 
     <!-- Dynamic parameters -->
-    <rosparam param="max_acceleration"> 4.0 </rosparam>
+    <rosparam param="max_acceleration"> 3.0 </rosparam>
     <rosparam param="max_velocity"> 2.5 </rosparam>
 
   </node>
@@ -41,8 +41,8 @@
 
     <!-- Initial position/yaw of the quads -->
     <rosparam param="InitialPosition"> [6.0,  0.0, 2.0,
-                                        6.0, -1.5, 1.1,
-                                        6.0,  1.5, 1.2] </rosparam>
+                                        6.0, -1.5, 1.2,
+                                        6.0,  1.5, 1.1] </rosparam>
     <rosparam param="InitialYaw"> [3.1415,
                                    3.1415,
                                    3.1415] </rosparam>
@@ -53,7 +53,7 @@
 
 
     <!-- Dynamic parameters -->
-    <rosparam param="max_acceleration"> 4.0 </rosparam>
+    <rosparam param="max_acceleration"> 3.0 </rosparam>
     <rosparam param="max_velocity"> 2.5 </rosparam>
 
   </node>
