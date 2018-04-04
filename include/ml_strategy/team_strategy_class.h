@@ -85,7 +85,6 @@ class TeamStrategy {
  public:
  	std::set<QuadData> quads_;
  	std::set<EnemyData> enemies_;
- 	std::string goalkeeper_;
  	Eigen::Vector3d team_balloon_, enemy_balloon_;
  	uint n_quads_, n_enemies_;
     double max_acc_, max_vel_;
