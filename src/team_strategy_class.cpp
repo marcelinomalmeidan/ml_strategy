@@ -213,20 +213,18 @@ void TeamStrategy::UpdateOffensive(const std::set<QuadData>::iterator &it) {
 	if(it->role.AttackState.State == it->role.AttackState.ADVANCING) {
 		Eigen::Vector3d pos = 
 			helper::Point2vec3d(it->vehicle_odom.pose.pose.position);
+
+		// If a teammate is already targetting ballon or balloon is already popped
+		if(balloon_popped_ || balloon_targeted_) {
+			it->role.AttackState.State = it->role.AttackState.RETURNING;
+		}
 		
 		// Vector from quad to enemy balloon
-		// Eigen::Vector3d vec_quad2balloon = enemy_balloon_ - pos;
 		double dist;
 		enemy_balloon_plane_.DistancePoint2Plane(pos, &dist);
 		if(dist < 0) {  // dist < 0 imples quad beyond balloon
-			if(!balloon_targeted_) {
-				it->role.AttackState.State = it->role.AttackState.BALLOON;
-				balloon_targeted_ = true;
-				// ROS_INFO("Quads ""%s"" is in BALLOON mode!", it->name.c_str());
-			} else {
-				it->role.AttackState.State = it->role.AttackState.RETURNING;
-				// ROS_INFO("Quads ""%s"" is in RETURNING mode!", it->name.c_str());
-			}
+			it->role.AttackState.State = it->role.AttackState.BALLOON;
+			balloon_targeted_ = true;
 		}
 	}
 
@@ -236,7 +234,7 @@ void TeamStrategy::UpdateOffensive(const std::set<QuadData>::iterator &it) {
 			helper::Point2vec3d(it->vehicle_odom.pose.pose.position);
 		if((enemy_balloon_ - pos).norm() < 0.1) {  // Balloon probably popped
 			it->role.AttackState.State = it->role.AttackState.RETURNING;
-			// ROS_INFO("Quads ""%s"" is in RETURNING mode!", it->name.c_str());
+			balloon_popped_ = true;
 		}
 	}
 }
@@ -249,9 +247,7 @@ void TeamStrategy::UpdateDefensive(const std::set<QuadData>::iterator &it) {
 	// Keep quad steady at its initial position until a dangerous
 	// enemy is seen
 	if(it->role.DefenseState.State == it->role.DefenseState.STEADY) {
-		// ROS_INFO("%s STEADY", it->name.c_str());
 		if(dangerous_quads.size() > 0) {
-			// ROS_INFO("%s switching to TARGETING", it->name.c_str());
 			it->role.DefenseState.State = it->role.DefenseState.TARGETING;
 			it->role.DefenseState.target_name = dangerous_quads[0];
 			dangerous_iterator[0]->targeted = true;
@@ -260,11 +256,9 @@ void TeamStrategy::UpdateDefensive(const std::set<QuadData>::iterator &it) {
  
 	// If targeting an enemy, track him until enemy is no longer dangerous
 	if(it->role.DefenseState.State == it->role.DefenseState.TARGETING) {
-		// ROS_INFO("%s TARGETING", it->name.c_str());
 		std::set<EnemyData>::iterator it_target;
 		FindEnemyIndex(it->role.DefenseState.target_name, &it_target);
 		if (it_target->danger.State == it_target->danger.NEUTRAL) {
-			// ROS_INFO("%s switching to RETURNING", it->name.c_str());
 			it->role.DefenseState.State = it->role.DefenseState.RETURNING;
 			it->role.DefenseState.target_name = "";
 			it_target->targeted = false;
@@ -273,11 +267,9 @@ void TeamStrategy::UpdateDefensive(const std::set<QuadData>::iterator &it) {
 
 	// If ended targeting an enemy, return to initial position
 	if(it->role.DefenseState.State == it->role.DefenseState.RETURNING) {
-		// ROS_INFO("%s RETURNING", it->name.c_str());
 		Eigen::Vector3d pos = 
 			helper::Point2vec3d(it->vehicle_odom.pose.pose.position);
 		if((it->init_pos - pos).norm() < 0.5) {  // Close to initial position
-			// ROS_INFO("%s switching to STEADY", it->name.c_str());
 			it->role.DefenseState.State = it->role.DefenseState.STEADY;
 		}
 	}
@@ -333,7 +325,6 @@ mg_msgs::PVA TeamStrategy::GetRefRk4(const std::set<QuadData>::iterator &it,
 
 	// Set new reference data
 	return reference;
-	// it->reference = reference;
 }
 
 void TeamStrategy::OffensiveReturn(const std::set<QuadData>::iterator &it,
@@ -349,13 +340,11 @@ void TeamStrategy::OffensiveReturn(const std::set<QuadData>::iterator &it,
     // Vector from quad to its initial position
 	Eigen::Vector3d vec_quad2init_pos = (it->init_pos - pos);
 	
-	// Force leading towards initial position
+	// References leading to initial position
 	if (vec_quad2init_pos.norm() > max_acc_/kd) {
-		// Eigen::Vector3d ref_pos = it->init_pos;
 		Eigen::Vector3d ref_vel = max_vel_*vec_quad2init_pos.normalized();
-		// Eigen::Vector3d desired_acc = max_acc_*vec_quad2init_pos.normalized();
 		Eigen::Vector3d ref_acc = kd*(ref_vel - vel);
-		it->reference_integrator.y_ = pos;
+		it->reference_integrator.SetPos(pos);
 		it->reference_integrator.UpdateStates(ref_acc, dt);
 	} else {
 		Eigen::Vector3d ref_pos = it->init_pos;
@@ -383,12 +372,11 @@ void TeamStrategy::OffensiveAdvance(const std::set<QuadData>::iterator &it,
 	
 	// Force leading towards enemy balloon plane
 	Eigen::Vector3d ref_vel = max_vel_*vec_quad2balloon_plane;
-	// Eigen::Vector3d desired_acc = max_acc_*vec_quad2balloon_plane;
 	Eigen::Vector3d ref_acc = kd*(ref_vel - vel);
 
 	// Set position reference as current, update rk4 based on
-	// velocity and acceleration only
-	it->reference_integrator.y_ = pos;
+	// velocity error
+	it->reference_integrator.SetPos(pos);
 	it->reference_integrator.UpdateStates(ref_acc, dt);
 
 	it->reference = this->GetRefRk4(it, dt);
@@ -398,11 +386,9 @@ void TeamStrategy::OffensiveBalloon(const std::set<QuadData>::iterator &it,
 	                                const double &dt) {
 	double kd = 2.0, kp = 3.0;
 
-	// Get position and velocity
+	// Get position
 	Eigen::Vector3d pos = 
 		helper::Point2vec3d(it->vehicle_odom.pose.pose.position);
-	Eigen::Vector3d vel = 
-		helper::Vec32vec3d(it->vehicle_odom.twist.twist.linear);
 	
 	// Reference position: enemy balloon
 	Eigen::Vector3d ref_pos = enemy_balloon_;
@@ -426,7 +412,7 @@ void TeamStrategy::DefensiveTargeting(const std::set<QuadData>::iterator &it,
 	                                   const double &dt) {
 	double kd = 5.0, kp1 = 2.0;
 
-	// Find nearest point in balloon plane
+	// Get position and velocity
 	Eigen::Vector3d pos = 
 		helper::Point2vec3d(it->vehicle_odom.pose.pose.position);
 	Eigen::Vector3d vel = 
@@ -466,7 +452,7 @@ void TeamStrategy::DefensiveTargeting(const std::set<QuadData>::iterator &it,
 
 	// Set position reference as current, update rk4 based on
 	// velocity only
-	it->reference_integrator.y_ = ref_pos;
+	it->reference_integrator.SetPos(ref_pos);
 	it->reference_integrator.UpdateStates(ref_acc, dt);
 
 	it->reference = this->GetRefRk4(it, dt);
@@ -487,11 +473,9 @@ void TeamStrategy::DefensiveReturn(const std::set<QuadData>::iterator &it,
 	
 	// Force leading towards initial position
 	if (vec_quad2init_pos.norm() > max_acc_/kp) {
-		// Eigen::Vector3d ref_pos = it->init_pos;
 		Eigen::Vector3d ref_vel = max_vel_*vec_quad2init_pos.normalized();
-		// Eigen::Vector3d desired_acc = max_acc_*vec_quad2init_pos.normalized();
 		Eigen::Vector3d ref_acc = kd*(ref_vel - vel);
-		it->reference_integrator.y_ = pos;
+		it->reference_integrator.SetPos(pos);
 		it->reference_integrator.UpdateStates(ref_acc, dt);
 	} else {
 		Eigen::Vector3d ref_pos = it->init_pos;

@@ -37,6 +37,7 @@ class rk4 {  // Runge-kutta for time-invariant systems
                   	  const double &dt);
     void ResetStates(const Eigen::Vector3d &Pos);
     void ResetStates(const nav_msgs::Odometry &odom);
+    void SetPos(const Eigen::Vector3d &pos);
     void GetPos(Eigen::Vector3d *pos);
     void GetPos(geometry_msgs::Point *pos);
     void GetVel(Eigen::Vector3d *vel);

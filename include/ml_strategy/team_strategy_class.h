@@ -21,7 +21,7 @@ struct AttackStates{
 
 // Defensive states
 struct DefenseStates{
-	uint STEADY = 0;  	 // Steady at a give area
+	uint STEADY = 0;  	 // Steady at a given area
 	uint TARGETING = 1;  // Targeting an enemy
 	uint RETURNING = 2;  // Targeting an enemy
 
@@ -93,6 +93,7 @@ class TeamStrategy {
     Eigen::Vector3d defensive_direction_ = Eigen::Vector3d(-1.0, 0.0, 0.0);
     Plane3d enemy_balloon_plane_;  // Used to find distance to balloon plane
     bool balloon_targeted_ = false;
+    bool balloon_popped_ = false;
 
  	// Constructors
  	TeamStrategy();
@@ -123,7 +124,7 @@ class TeamStrategy {
                 		std::set<EnemyData>::iterator *index);
     void PublishReferences();
 
-    // Rules to update defensive and offensive state machine
+    // Rules to update defensive and offensive state machines
     void UpdateAttDefStateMachine();
     void UpdateOffensive(const std::set<QuadData>::iterator &it);
     void UpdateDefensive(const std::set<QuadData>::iterator &it);
