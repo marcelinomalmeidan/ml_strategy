@@ -4,17 +4,18 @@
 #include "ml_strategy/team_strategy_class.h"
 #include <thread>
 
-struct globalVariables {
+class globalVariables {
+ public:
     // Mutex protected variables
     TeamStrategy obj_team_strategy;
 };
 
-class mutexStruct {
+class mutexClass {
  public:
     pthread_mutex_t m_team_strategy;
 
     // Methods
-    mutexStruct() {
+    mutexClass() {
         pthread_mutex_init(&m_team_strategy, NULL);
     }
     void destroy() {

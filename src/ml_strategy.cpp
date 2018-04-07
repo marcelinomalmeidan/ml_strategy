@@ -3,7 +3,7 @@
 
 // Global variables--------------------------
 globalVariables globals_;
-mutexStruct mutexes_;
+mutexClass mutexes_;
 
 void GameStateCallback(const mg_msgs::GameState::ConstPtr& msg) {
 	uint n_quads = msg->GameState.size();

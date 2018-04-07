@@ -64,8 +64,7 @@ void TeamStrategy::AddQuad(const std::string &quad_name,
 		new_quad.reference.Pos = helper::Vec3d2point(ref_pos);
 		new_quad.reference.yaw = yaw_ref;
 		new_quad.init_pos = ref_pos;
-		new_quad.vehicle_odom = helper::GetZeroOdom();
-		new_quad.vehicle_odom.pose.pose.position = helper::Vec3d2point(ref_pos);
+		new_quad.quad_state.position = ref_pos;
 		new_quad.role.State = role;
 		new_quad.reference_integrator = rk4(max_vel_, max_acc_, ref_pos);
 		new_quad.nh = *nh;
@@ -84,11 +83,18 @@ void TeamStrategy::AddEnemy(const std::string &enemy_name,
 	if(enemies_.find(new_enemy) != enemies_.end()) {
 		ROS_WARN("[mediation layer] Tried to add quad ""%s"": already exists!", enemy_name.c_str());
 	} else {
-		new_enemy.vehicle_odom = odom;
 		new_enemy.targeted = false;
 		enemies_.insert(new_enemy);
 		n_enemies_ = n_enemies_ + 1;
 	}
+}
+
+void TeamStrategy::Odom2QuatStates(const nav_msgs::Odometry &odom,
+                                   QuadState *quad_state) {
+	quad_state->position = helper::Point2vec3d(odom.pose.pose.position);
+	quad_state->orientation = helper::RosQuat2EigenQuat(odom.pose.pose.orientation);
+	quad_state->velocity = helper::Vec32vec3d(odom.twist.twist.linear);
+	quad_state->angular_velocity = helper::Vec32vec3d(odom.twist.twist.angular);
 }
 
 void TeamStrategy::UpdateQuadOdom(const std::string &name, 
@@ -96,12 +102,12 @@ void TeamStrategy::UpdateQuadOdom(const std::string &name,
 	std::set<QuadData>::iterator it1;
 	this->FindQuadIndex(name, &it1);
 	if (it1 != quads_.end()) {  // The quad is in the team
-		it1->vehicle_odom = odom;
+		this->Odom2QuatStates(odom, &it1->quad_state);
 	} else {  // If not in the team, must be an enemy
 		std::set<EnemyData>::iterator it2;
 		this->FindEnemyIndex(name, &it2);
 		if (it2 != enemies_.end()) {  // If enemy exists
-			it2->vehicle_odom = odom;
+			this->Odom2QuatStates(odom, &it2->quad_state);
 		} else {  // Create new enemy
 			this->AddEnemy(name, odom);
 		}
@@ -115,10 +121,8 @@ void TeamStrategy::EnemyDangerUpdate() {
 	std::set<EnemyData>::iterator it;
 	for(it = enemies_.begin(); it != enemies_.end(); ++it) {
 		// Get enemy position and velocity
-		Eigen::Vector3d pos = 
-			helper::Point2vec3d(it->vehicle_odom.pose.pose.position);
-		Eigen::Vector3d vel = 
-			helper::Vec32vec3d(it->vehicle_odom.twist.twist.linear);
+		Eigen::Vector3d pos = it->quad_state.position;
+		Eigen::Vector3d vel = it->quad_state.velocity;
 
 		// Vector from quad to team balloon
 		Eigen::Vector3d vec_quad2balloon = team_balloon_ - pos;
@@ -211,8 +215,7 @@ void TeamStrategy::UpdateOffensive(const std::set<QuadData>::iterator &it) {
 	// If advancing, go to pop the balloon if passes through 
 	// balloon plane
 	if(it->role.AttackState.State == it->role.AttackState.ADVANCING) {
-		Eigen::Vector3d pos = 
-			helper::Point2vec3d(it->vehicle_odom.pose.pose.position);
+		Eigen::Vector3d pos = it->quad_state.position;
 
 		// If a teammate is already targetting ballon or balloon is already popped
 		if(balloon_popped_ || balloon_targeted_) {
@@ -230,8 +233,7 @@ void TeamStrategy::UpdateOffensive(const std::set<QuadData>::iterator &it) {
 
 	// If pops the balloon, go to returning mode
 	if(it->role.AttackState.State == it->role.AttackState.BALLOON) {
-		Eigen::Vector3d pos = 
-			helper::Point2vec3d(it->vehicle_odom.pose.pose.position);
+		Eigen::Vector3d pos = it->quad_state.position;
 		if((enemy_balloon_ - pos).norm() < 0.1) {  // Balloon probably popped
 			it->role.AttackState.State = it->role.AttackState.RETURNING;
 			balloon_popped_ = true;
@@ -267,8 +269,7 @@ void TeamStrategy::UpdateDefensive(const std::set<QuadData>::iterator &it) {
 
 	// If ended targeting an enemy, return to initial position
 	if(it->role.DefenseState.State == it->role.DefenseState.RETURNING) {
-		Eigen::Vector3d pos = 
-			helper::Point2vec3d(it->vehicle_odom.pose.pose.position);
+		Eigen::Vector3d pos = it->quad_state.position;
 		if((it->init_pos - pos).norm() < 0.5) {  // Close to initial position
 			it->role.DefenseState.State = it->role.DefenseState.STEADY;
 		}
@@ -332,10 +333,8 @@ void TeamStrategy::OffensiveReturn(const std::set<QuadData>::iterator &it,
 	double kd = 2.0;
 
 	// Get current position/velocity of vehicle
-	Eigen::Vector3d pos = 
-		helper::Point2vec3d(it->vehicle_odom.pose.pose.position);
-	Eigen::Vector3d vel = 
-		helper::Vec32vec3d(it->vehicle_odom.twist.twist.linear);
+	Eigen::Vector3d pos = it->quad_state.position;
+	Eigen::Vector3d vel = it->quad_state.velocity;
     
     // Vector from quad to its initial position
 	Eigen::Vector3d vec_quad2init_pos = (it->init_pos - pos);
@@ -359,10 +358,8 @@ void TeamStrategy::OffensiveAdvance(const std::set<QuadData>::iterator &it,
 	double kd = 2.0;
 
 	// Find nearest point in balloon plane
-	Eigen::Vector3d pos = 
-		helper::Point2vec3d(it->vehicle_odom.pose.pose.position);
-	Eigen::Vector3d vel = 
-		helper::Vec32vec3d(it->vehicle_odom.twist.twist.linear);
+	Eigen::Vector3d pos = it->quad_state.position;
+	Eigen::Vector3d vel = it->quad_state.velocity;
     Eigen::Vector3d nearest_point;		
 	double dist;
 	enemy_balloon_plane_.ProjectPointOntoPlane(pos, &nearest_point, &dist);
@@ -387,8 +384,7 @@ void TeamStrategy::OffensiveBalloon(const std::set<QuadData>::iterator &it,
 	double kd = 2.0, kp = 3.0;
 
 	// Get position
-	Eigen::Vector3d pos = 
-		helper::Point2vec3d(it->vehicle_odom.pose.pose.position);
+	Eigen::Vector3d pos = it->quad_state.position;
 	
 	// Reference position: enemy balloon
 	Eigen::Vector3d ref_pos = enemy_balloon_;
@@ -413,18 +409,14 @@ void TeamStrategy::DefensiveTargeting(const std::set<QuadData>::iterator &it,
 	double kd = 5.0, kp1 = 2.0;
 
 	// Get position and velocity
-	Eigen::Vector3d pos = 
-		helper::Point2vec3d(it->vehicle_odom.pose.pose.position);
-	Eigen::Vector3d vel = 
-		helper::Vec32vec3d(it->vehicle_odom.twist.twist.linear);
+	Eigen::Vector3d pos = it->quad_state.position;
+	Eigen::Vector3d vel = it->quad_state.velocity;
 
 	// Find position of enemy
 	std::set<EnemyData>::iterator it_target;
 	FindEnemyIndex(it->role.DefenseState.target_name, &it_target);
-	Eigen::Vector3d pos_target = 
-		helper::Point2vec3d(it_target->vehicle_odom.pose.pose.position);
-	Eigen::Vector3d vel_target = 
-		helper::Vec32vec3d(it_target->vehicle_odom.twist.twist.linear);
+	Eigen::Vector3d pos_target = it_target->quad_state.position;
+	Eigen::Vector3d vel_target = it_target->quad_state.velocity;
 
 	// Define plane with normal towards enemy base, and origin at defense line
 	Eigen::Vector3d init_pos = it->init_pos;
@@ -463,10 +455,8 @@ void TeamStrategy::DefensiveReturn(const std::set<QuadData>::iterator &it,
 	double kd = 2.0, kp = 3.0;
 
 	// Get current position/velocity of vehicle
-	Eigen::Vector3d pos = 
-		helper::Point2vec3d(it->vehicle_odom.pose.pose.position);
-	Eigen::Vector3d vel = 
-		helper::Vec32vec3d(it->vehicle_odom.twist.twist.linear);
+	Eigen::Vector3d pos = it->quad_state.position;
+	Eigen::Vector3d vel = it->quad_state.velocity;
     
     // Vector from quad to its initial position
 	Eigen::Vector3d vec_quad2init_pos = (it->init_pos - pos);

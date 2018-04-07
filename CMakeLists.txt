@@ -35,10 +35,11 @@ include_directories(
 
 add_executable(ml_strategy 
                src/ml_strategy.cpp
+               src/linear_algebra.cpp
                src/team_strategy_class.cpp
                src/helper.cpp
                src/threads.cpp
-               src/rk4)
+               src/rk4.cpp)
 target_link_libraries(ml_strategy ${catkin_LIBRARIES})
 add_dependencies(ml_strategy ${catkin_EXPORTED_TARGETS})
 add_dependencies(ml_strategy mg_msgs_generate_messages_cpp)

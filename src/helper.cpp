@@ -159,6 +159,11 @@ nav_msgs::Odometry GetZeroOdom() {
 	return odom;
 }
 
+// ROS quaternion to Eigen quaternion
+Eigen::Quaterniond RosQuat2EigenQuat(geometry_msgs::Quaternion quat) {
+	return Eigen::Quaterniond(quat.w, quat.x, quat.y, quat.z);
+}
+
 Eigen::Matrix3d Triad(Eigen::Vector3d v1, Eigen::Vector3d v2) {
 	Eigen::Vector3d z_bdes, x_cdes, y_bdes, x_bdes;
 	Eigen::Matrix3d Rot;

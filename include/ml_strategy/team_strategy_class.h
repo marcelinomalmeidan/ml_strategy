@@ -11,7 +11,8 @@
 #include "mg_msgs/PVA.h"
 
 // Offensive states
-struct AttackStates{
+class AttackStates{
+ public:
 	uint RETURNING = 0;  // Return to team's area
 	uint ADVANCING = 1;  // Going towards opponent's team base
 	uint BALLOON = 2;    // Aiming the balloon
@@ -20,7 +21,8 @@ struct AttackStates{
 };
 
 // Defensive states
-struct DefenseStates{
+class DefenseStates{
+ public:
 	uint STEADY = 0;  	 // Steady at a given area
 	uint TARGETING = 1;  // Targeting an enemy
 	uint RETURNING = 2;  // Targeting an enemy
@@ -30,7 +32,8 @@ struct DefenseStates{
 };
 
 // Quadcopter roles
-struct QuadRole{
+class QuadRole{
+ public:
 	uint GOALKEEPER = 0;
 	uint DEFENSIVE_RIGHT = 1;
 	uint DEFENSIVE_LEFT = 2;
@@ -45,7 +48,8 @@ struct QuadRole{
 };
 
 // Enemy danger assignment
-struct EnemyDanger{
+class EnemyDanger{
+ public:
 	uint NEUTRAL = 0;
 	uint WARNING = 1;
 	uint DANGER = 2;
@@ -53,12 +57,21 @@ struct EnemyDanger{
 	uint State = NEUTRAL;
 };
 
-struct QuadData {
+class QuadState{
+ public:
+    Eigen::Vector3d position;            // Quad position (meters)
+    Eigen::Quaterniond orientation;      // Quad orientation (quaternion)
+    Eigen::Vector3d velocity;            // Quad velocity (m/s)
+    Eigen::Vector3d angular_velocity;    // Quad angular velocity (rad/s)
+};
+
+class QuadData {
+ public:
     std::string name;                            // Unique name for vehicle
     mutable QuadRole role;					     // Quad role in the team
-    mutable mg_msgs::PVA reference;			     // Output reference
-    mutable Eigen::Vector3d init_pos;			 // Initial pos to return later on
-    mutable nav_msgs::Odometry vehicle_odom;     // Measured odometry
+    mutable mg_msgs::PVA reference;			     // Output reference structure
+    mutable Eigen::Vector3d init_pos;			 // Initial pos to return later on (meters)
+    mutable QuadState quad_state;                // Measured quad states
     mutable rk4 reference_integrator;            // Runge-kutta dynamics integrator
     mutable ros::NodeHandle nh;                  // ROS Nodehandle
     mutable ros::Publisher pub_reference;  		 // Publishes the reference
@@ -69,9 +82,10 @@ struct QuadData {
     }
 };
 
-struct EnemyData {
+class EnemyData {
+ public:
     std::string name;                            // Unique name for vehicle
-    mutable nav_msgs::Odometry vehicle_odom;     // Measured odometry
+    mutable QuadState quad_state;                // Measured quad states
     mutable EnemyDanger danger;					 // Danger labels for enemies
     mutable bool targeted;						 // Enemy is being targeted by a teammate
 
@@ -112,6 +126,8 @@ class TeamStrategy {
 		         ros::NodeHandle *nh);
 	void AddEnemy(const std::string &enemy_name,
 			      const nav_msgs::Odometry &odom);
+    void Odom2QuatStates(const nav_msgs::Odometry &odom,
+                         QuadState *quad_state);
     void UpdateQuadOdom(const std::string &name, 
                         const nav_msgs::Odometry &odom);
     void EnemyDangerUpdate();

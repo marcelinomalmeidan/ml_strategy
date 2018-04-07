@@ -12,4 +12,4 @@
 
 // Declare global variables
 extern globalVariables globals_;
-extern mutexStruct mutexes_;
+extern mutexClass mutexes_;

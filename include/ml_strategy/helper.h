@@ -80,6 +80,9 @@ mg_msgs::PVA GetEmptyPVA();
 // Get a zero version of the odometry message type
 nav_msgs::Odometry GetZeroOdom();
 
+// ROS quaternion to Eigen quaternion
+Eigen::Quaterniond RosQuat2EigenQuat(geometry_msgs::Quaternion quat);
+
 // Return a rotation matrix with v1 aligned with z, and v2 projected into x
 Eigen::Matrix3d Triad(Eigen::Vector3d v1, Eigen::Vector3d v2);
 
