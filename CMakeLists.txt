@@ -43,3 +43,6 @@ add_executable(ml_strategy
 target_link_libraries(ml_strategy ${catkin_LIBRARIES})
 add_dependencies(ml_strategy ${catkin_EXPORTED_TARGETS})
 add_dependencies(ml_strategy mg_msgs_generate_messages_cpp)
+
+install(TARGETS ml_strategy
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
