@@ -69,6 +69,9 @@ void TeamStrategy::AddQuad(const std::string &quad_name,
 		new_quad.reference_integrator = rk4(max_vel_, max_acc_, ref_pos);
 		new_quad.nh = *nh;
 		new_quad.pub_reference = new_quad.nh.advertise<mg_msgs::PVA>(output_topic, 1);
+		new_quad.set_ready_client = 
+        new_quad.nh.serviceClient<mg_msgs::SetQuadBool>("/mediation_layer/set_quad_ready");
+
 		quads_.insert(new_quad);
 		n_quads_ = n_quads_ + 1;
 	}
@@ -207,6 +210,18 @@ void TeamStrategy::UpdateAttDefStateMachine() {
 
 void TeamStrategy::UpdateOffensive(const std::set<QuadData>::iterator &it) {
 
+	// Takeoff to desired initial position
+	if(it->role.AttackState.State == it->role.AttackState.TAKEOFF) {
+		Eigen::Vector3d pos = it->quad_state.position;
+		if((it->init_pos - pos).norm() < 0.1) {
+			it->role.AttackState.State = it->role.AttackState.READY;
+			mg_msgs::SetQuadBool ready_msg;
+			ready_msg.request.set_bool = 1;
+			ready_msg.request.quad_name = it->name;
+			it->set_ready_client.call(ready_msg);
+		}
+	}
+
 	// This strategy makes a quad go back home
 	if(it->role.AttackState.State == it->role.AttackState.RETURNING) {
 		// Can't get out of this state
@@ -245,6 +260,18 @@ void TeamStrategy::UpdateDefensive(const std::set<QuadData>::iterator &it) {
 	std::vector<std::string> dangerous_quads;
 	std::vector<std::set<EnemyData>::iterator> dangerous_iterator;
 	this->GetDangerousEnemies(&dangerous_quads, &dangerous_iterator);
+
+	// Takeoff to desired initial position
+	if(it->role.DefenseState.State == it->role.DefenseState.TAKEOFF) {
+		Eigen::Vector3d pos = it->quad_state.position;
+		if((it->init_pos - pos).norm() < 0.1) {
+			it->role.DefenseState.State = it->role.DefenseState.READY;
+			mg_msgs::SetQuadBool ready_msg;
+			ready_msg.request.set_bool = 1;
+			ready_msg.request.quad_name = it->name;
+			it->set_ready_client.call(ready_msg);
+		}
+	}
 
 	// Keep quad steady at its initial position until a dangerous
 	// enemy is seen
@@ -291,6 +318,8 @@ void TeamStrategy::UpdateReferences(const double &dt) {
 				this->DefensiveTargeting(it, dt);
 			} else if(it->role.DefenseState.State == it->role.DefenseState.RETURNING) {
 				this->DefensiveReturn(it, dt);
+			} else if(it->role.DefenseState.State == it->role.DefenseState.LANDING) {
+				this->Landing(it, dt);
 			}
 		} else if((it->role.State == it->role.OFFENSIVE_RIGHT) ||
 				  (it->role.State == it->role.OFFENSIVE_LEFT) ||
@@ -301,6 +330,8 @@ void TeamStrategy::UpdateReferences(const double &dt) {
 				this->OffensiveAdvance(it, dt);
 			} else if(it->role.AttackState.State == it->role.AttackState.BALLOON) {
 				this->OffensiveBalloon(it, dt);
+			} else if(it->role.DefenseState.State == it->role.DefenseState.LANDING) {
+				this->Landing(it, dt);
 			}
 		}
 	}
@@ -473,4 +504,56 @@ void TeamStrategy::DefensiveReturn(const std::set<QuadData>::iterator &it,
 	}
 
 	it->reference = this->GetRefRk4(it, dt);
+}
+
+void TeamStrategy::Landing(const std::set<QuadData>::iterator &it,
+                           const double &dt) {
+	double kd = 2.0, kp = 3.0;
+	double max_land_vel = 0.5;
+
+	// Get current position/velocity of vehicle
+	Eigen::Vector3d pos = it->quad_state.position;
+	Eigen::Vector3d vel = it->quad_state.velocity;
+    
+    // Vector from quad to its initial position
+    Eigen::Vector3d land_pos(pos[0], pos[1], 0.0);
+	Eigen::Vector3d vec_quad2ground = land_pos - pos;
+	
+	// Force leading towards initial position
+	if (vec_quad2ground.norm() > max_acc_/kp) {
+		Eigen::Vector3d ref_vel = max_land_vel*vec_quad2ground.normalized();
+		Eigen::Vector3d ref_acc = kd*(ref_vel - vel);
+		it->reference_integrator.SetPos(pos);
+		it->reference_integrator.UpdateStates(ref_acc, dt);
+	} else {
+		Eigen::Vector3d ref_pos = land_pos;
+		it->reference_integrator.ResetStates(ref_pos);
+	}
+
+	it->reference = this->GetRefRk4(it, dt);
+}
+
+void TeamStrategy::SetStartGame() {
+	std::set<QuadData>::iterator it;
+	for(it = quads_.begin(); it != quads_.end(); ++it)  {
+		// Defensive update
+		if((it->role.State == it->role.GOALKEEPER) ||
+		   (it->role.State == it->role.DEFENSIVE_RIGHT) ||
+		   (it->role.State == it->role.DEFENSIVE_LEFT) ||
+		   (it->role.State == it->role.DEFENSIVE_CENTRAL)) {
+			it->role.DefenseState.State = it->role.DefenseState.STEADY;
+		} else if((it->role.State == it->role.OFFENSIVE_RIGHT) ||
+				  (it->role.State == it->role.OFFENSIVE_LEFT) ||
+				  (it->role.State == it->role.OFFENSIVE_CENTRAL)) {
+			it->role.AttackState.State = it->role.AttackState.ADVANCING;
+		}
+	}
+}
+
+void TeamStrategy::SetQuadsToLand() {
+	std::set<QuadData>::iterator it;
+	for(it = quads_.begin(); it != quads_.end(); ++it)  {
+		it->role.DefenseState.State = it->role.DefenseState.LANDING;
+		it->role.AttackState.State = it->role.AttackState.LANDING;
+	}
 }

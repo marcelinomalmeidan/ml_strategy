@@ -9,25 +9,32 @@
 #include "ml_strategy/rk4.h"
 #include "nav_msgs/Odometry.h"
 #include "mg_msgs/PVA.h"
+#include "mg_msgs/SetQuadBool.h"
 
 // Offensive states
 class AttackStates{
  public:
-	uint RETURNING = 0;  // Return to team's area
-	uint ADVANCING = 1;  // Going towards opponent's team base
-	uint BALLOON = 2;    // Aiming the balloon
+    uint TAKEOFF = 0;    // Takeoff
+    uint READY = 1;      // Quad ready to start
+	uint RETURNING = 1;  // Return to team's area
+	uint ADVANCING = 2;  // Going towards opponent's team base
+	uint BALLOON = 3;    // Aiming the balloon
+    uint LANDING = 4;
 
-	uint State = ADVANCING;
+	uint State = TAKEOFF;
 };
 
 // Defensive states
 class DefenseStates{
  public:
-	uint STEADY = 0;  	 // Steady at a given area
-	uint TARGETING = 1;  // Targeting an enemy
-	uint RETURNING = 2;  // Targeting an enemy
+    uint TAKEOFF = 0;    //Takeoff
+    uint READY = 1;      // Quad ready to start
+	uint STEADY = 2;  	 // Steady at a given area
+	uint TARGETING = 3;  // Targeting an enemy
+	uint RETURNING = 4;  // Targeting an enemy
+    uint LANDING = 5;
 
-	uint State = STEADY;
+	uint State = TAKEOFF;
 	std::string target_name = "";
 };
 
@@ -75,6 +82,7 @@ class QuadData {
     mutable rk4 reference_integrator;            // Runge-kutta dynamics integrator
     mutable ros::NodeHandle nh;                  // ROS Nodehandle
     mutable ros::Publisher pub_reference;  		 // Publishes the reference
+    mutable ros::ServiceClient set_ready_client;
 
     bool operator<(const QuadData& other) const {
         int compareResult = name.compare(other.name);
@@ -107,6 +115,7 @@ class TeamStrategy {
     Plane3d enemy_balloon_plane_;  // Used to find distance to balloon plane
     bool balloon_targeted_ = false;
     bool balloon_popped_ = false;
+    ros::Subscriber start_game_sub_;
 
  	// Constructors
  	TeamStrategy();
@@ -160,6 +169,10 @@ class TeamStrategy {
 	                        const double &dt);
 	void DefensiveReturn(const std::set<QuadData>::iterator &it,
 	                     const double &dt);
+    void Landing(const std::set<QuadData>::iterator &it,
+                         const double &dt);
+    void SetStartGame();
+    void SetQuadsToLand();
 
 };
 

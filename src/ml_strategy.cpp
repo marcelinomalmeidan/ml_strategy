@@ -5,19 +5,6 @@
 globalVariables globals_;
 mutexClass mutexes_;
 
-void GameStateCallback(const mg_msgs::GameState::ConstPtr& msg) {
-	uint n_quads = msg->GameState.size();
-	pthread_mutex_lock(&mutexes_.m_team_strategy);
-	for (uint i = 0; i < n_quads; i++) {
-		globals_.obj_team_strategy.
-			UpdateQuadOdom(msg->GameState[i].child_frame_id, 
-				           msg->GameState[i]);
-	}
-	pthread_mutex_unlock(&mutexes_.m_team_strategy);
-	// UpdateQuadOdom(const std::string &name, 
- //                                  const nav_msgs::Odometry &odom)
-}
-
 int main(int argc, char** argv){
 	ros::init(argc, argv, "ml_strategy");
 	ros::NodeHandle node("~");
@@ -78,13 +65,34 @@ int main(int argc, char** argv){
 		}
 	}
 
+	// Callbacks ---------------------------------------------------
   	ros::Subscriber game_state_sub = node.subscribe<mg_msgs::GameState>
-  				("/mediation_layer/Game_State", 10, GameStateCallback);
-  
-    // Threads -------------------------------------------
+  				("/mediation_layer/Game_State", 10, callbacks::GameStateCallback);
+	ros::Subscriber start_game_sub = node.subscribe
+				("/mediation_layer/Start_Game", 1, callbacks::GameStartCallback);
+	ros::Subscriber land_quads_sub = node.subscribe
+				("/mediation_layer/land_quads", 1, callbacks::LandAllQuadsCallback);
+
+    // Threads -----------------------------------------------------
   	std::thread h_strategy_thread;
   	const double strategy_rate = 30;
   	h_strategy_thread = std::thread(threads::ML_StrategyThread, strategy_rate);
+
+	// Call services to set shields
+	ros::ServiceClient shield_client = 
+		node.serviceClient<mg_msgs::SetQuadBool>("/mediation_layer/set_quad_shield");
+	mg_msgs::SetQuadBool srv_msg;
+	
+	// Set quad 1
+	for (uint i = 0; i < quad_names.size(); i++) {
+		if(i == 0) {
+			srv_msg.request.set_bool = 1;
+		} else {
+			srv_msg.request.set_bool = 0;
+		}
+		srv_msg.request.quad_name = quad_names[i];
+		shield_client.call(srv_msg);
+	}
 
 
 	// ROS loop that starts callbacks/publishers

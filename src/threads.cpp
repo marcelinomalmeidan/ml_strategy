@@ -9,10 +9,8 @@ void ML_StrategyThread(const double &rate) {
     double dt = 1/rate;
     ros::Rate loop_rate(rate);
 
-    // Send first reference position
-    pthread_mutex_lock(&mutexes_.m_team_strategy);
-        globals_.obj_team_strategy.PublishReferences();
-    pthread_mutex_unlock(&mutexes_.m_team_strategy);
+    // Sleep to get measurements before running the strategy
+    ros::Duration(0.5).sleep();
 
     // Run the strategy loop
     while (ros::ok()) {
