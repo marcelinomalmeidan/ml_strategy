@@ -16,10 +16,10 @@ class AttackStates{
  public:
     uint TAKEOFF = 0;    // Takeoff
     uint READY = 1;      // Quad ready to start
-	uint RETURNING = 1;  // Return to team's area
-	uint ADVANCING = 2;  // Going towards opponent's team base
-	uint BALLOON = 3;    // Aiming the balloon
-    uint LANDING = 4;
+	uint RETURNING = 2;  // Return to team's area
+	uint ADVANCING = 3;  // Going towards opponent's team base
+	uint BALLOON = 4;    // Aiming the balloon
+    uint LANDING = 5;
 
 	uint State = TAKEOFF;
 };
