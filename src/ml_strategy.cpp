@@ -69,9 +69,9 @@ int main(int argc, char** argv){
   	ros::Subscriber game_state_sub = node.subscribe<mg_msgs::GameState>
   				("/mediation_layer/Game_State", 10, callbacks::GameStateCallback);
 	ros::Subscriber start_game_sub = node.subscribe
-				("/mediation_layer/Start_Game", 1, callbacks::GameStartCallback);
+				("/mediation_layer/Start_Game", 10, callbacks::GameStartCallback);
 	ros::Subscriber land_quads_sub = node.subscribe
-				("/mediation_layer/land_quads", 1, callbacks::LandAllQuadsCallback);
+				("/mediation_layer/land_quads", 10, callbacks::LandAllQuadsCallback);
 
     // Threads -----------------------------------------------------
   	std::thread h_strategy_thread;
@@ -83,7 +83,7 @@ int main(int argc, char** argv){
 		node.serviceClient<mg_msgs::SetQuadBool>("/mediation_layer/set_quad_shield");
 	mg_msgs::SetQuadBool srv_msg;
 	
-	// Set quad 1
+	// Set quads
 	for (uint i = 0; i < quad_names.size(); i++) {
 		if(i == 0) {
 			srv_msg.request.set_bool = 1;

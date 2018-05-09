@@ -26,7 +26,8 @@ void GameStateCallback(const mg_msgs::GameState::ConstPtr& msg) {
 void LandAllQuadsCallback(const std_msgs::Empty& empty_msg) {
 	pthread_mutex_lock(&mutexes_.m_team_strategy);
 		globals_.obj_team_strategy.SetQuadsToLand();
-	pthread_mutex_unlock(&mutexes_.m_team_strategy);	
+	pthread_mutex_unlock(&mutexes_.m_team_strategy);
+	ROS_INFO("[ml_strategy Marcelino]: All quads in landing mode!");	
 }
 
 }  // namespace callbacks
