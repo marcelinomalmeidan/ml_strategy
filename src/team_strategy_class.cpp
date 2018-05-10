@@ -218,6 +218,7 @@ void TeamStrategy::UpdateOffensive(const std::set<QuadData>::iterator &it) {
 			mg_msgs::SetQuadBool ready_msg;
 			ready_msg.request.set_bool = 1;
 			ready_msg.request.quad_name = it->name;
+			ros::service::waitForService(it->set_ready_client.getService());
 			it->set_ready_client.call(ready_msg);
 		}
 	}
@@ -269,6 +270,7 @@ void TeamStrategy::UpdateDefensive(const std::set<QuadData>::iterator &it) {
 			mg_msgs::SetQuadBool ready_msg;
 			ready_msg.request.set_bool = 1;
 			ready_msg.request.quad_name = it->name;
+			ros::service::waitForService(it->set_ready_client.getService());
 			it->set_ready_client.call(ready_msg);
 		}
 	}
