@@ -484,6 +484,7 @@ void TeamStrategy::DefensiveTargeting(const std::set<QuadData>::iterator &it,
 	Eigen::Vector3d pos_projection;  // Enemy projection onto plane
 	double dist;					 // Enemy distance to plane
 	defense_plane.ProjectPointOntoPlane(pos_target, &pos_projection, &dist);
+	pos_projection = pos_projection - Eigen::Vector3d(0.0, 0.0, -0.2);
 
 	// Project enemy velocity onto plane
 	Eigen::Vector3d vel_projection;
@@ -536,7 +537,7 @@ void TeamStrategy::DefensiveReturn(const std::set<QuadData>::iterator &it,
 void TeamStrategy::Landing(const std::set<QuadData>::iterator &it,
                            const double &dt) {
 	double kd = 2.0, kp = 3.0;
-	double max_land_vel = 0.5;
+	double max_land_vel = 0.25;
 
 	// Get current position/velocity of vehicle
 	Eigen::Vector3d pos = it->quad_state.position;
@@ -547,7 +548,7 @@ void TeamStrategy::Landing(const std::set<QuadData>::iterator &it,
 	Eigen::Vector3d vec_quad2ground = land_pos - pos;
 	
 	// Force leading towards initial position
-	if (vec_quad2ground.norm() > max_acc_/kp) {
+	if (vec_quad2ground.norm() > 0.1) {
 		Eigen::Vector3d ref_vel = max_land_vel*vec_quad2ground.normalized();
 		Eigen::Vector3d ref_acc = kd*(ref_vel - vel);
 		it->reference_integrator.SetPos(pos);

@@ -83,16 +83,16 @@ int main(int argc, char** argv){
 		node.serviceClient<mg_msgs::SetQuadBool>("/mediation_layer/set_quad_shield");
 	mg_msgs::SetQuadBool srv_msg;
 	
-	// Set quads
-	for (uint i = 0; i < quad_names.size(); i++) {
-		if(i == 0) {
-			srv_msg.request.set_bool = 1;
-		} else {
-			srv_msg.request.set_bool = 0;
-		}
-		srv_msg.request.quad_name = quad_names[i];
-		shield_client.call(srv_msg);
-	}
+	// // Set quads
+	// for (uint i = 0; i < quad_names.size(); i++) {
+	// 	if(i == 0) {
+	// 		srv_msg.request.set_bool = 1;
+	// 	} else {
+	// 		srv_msg.request.set_bool = 0;
+	// 	}
+	// 	srv_msg.request.quad_name = quad_names[i];
+	// 	shield_client.call(srv_msg);
+	// }
 
 
 	// ROS loop that starts callbacks/publishers
