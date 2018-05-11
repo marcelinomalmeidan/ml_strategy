@@ -124,8 +124,8 @@ void TeamStrategy::UpdateQuadOdom(const std::string &name,
 }
 
 void TeamStrategy::EnemyDangerUpdate() {
-	const double warning_threshold = 4.0;
-	const double danger_threshold = 3.0;
+	const double warning_threshold = 6.0;
+	const double danger_threshold = 5.0;
 
 	std::set<EnemyData>::iterator it;
 	for(it = enemies_.begin(); it != enemies_.end(); ++it) {
