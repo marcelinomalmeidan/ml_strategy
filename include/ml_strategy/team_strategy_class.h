@@ -14,20 +14,22 @@
 // Offensive states
 class AttackStates{
  public:
-    uint TAKEOFF = 0;    // Takeoff
-    uint READY = 1;      // Quad ready to start
-	uint RETURNING = 2;  // Return to team's area
-	uint ADVANCING = 3;  // Going towards opponent's team base
-	uint BALLOON = 4;    // Aiming the balloon
-    uint LANDING = 5;
+    uint TAKEOFF = 0;       // Takeoff
+    uint READY = 1;         // Quad ready to start
+	uint RETURNING = 2;     // Return to team's area
+	uint ADVANCING = 3;     // Going towards opponent's team base
+	uint BALLOON = 4;       // Aiming the balloon
+    uint BALLOON_HOVER = 5; // Hover over the balloon for a while
+    uint LANDING = 6;
 
+    ros::Time state_init_time = ros::Time::now();
 	uint State = TAKEOFF;
 };
 
 // Defensive states
 class DefenseStates{
  public:
-    uint TAKEOFF = 0;    //Takeoff
+    uint TAKEOFF = 0;    // Takeoff
     uint READY = 1;      // Quad ready to start
 	uint STEADY = 2;  	 // Steady at a given area
 	uint TARGETING = 3;  // Targeting an enemy

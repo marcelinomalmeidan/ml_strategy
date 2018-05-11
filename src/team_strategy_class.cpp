@@ -13,9 +13,15 @@ TeamStrategy::TeamStrategy(const double max_vel,
 	max_acc_ = max_acc;
 	team_balloon_ = team_balloon;
 	enemy_balloon_ = enemy_balloon;
+	Eigen::Vector3d x_vec(1.0, 0.0, 0.0);
 	offensive_direction_ = (enemy_balloon - team_balloon).normalized();
+	if(offensive_direction_.dot(x_vec) > 0) {
+		offensive_direction_ = Eigen::Vector3d(1.0, 0.0, 0.0);
+	} else {
+		offensive_direction_ = Eigen::Vector3d(-1.0, 0.0, 0.0);
+	}
 	defensive_direction_ = -offensive_direction_;
-	enemy_balloon_plane_ = Plane3d(enemy_balloon_, defensive_direction_);
+	enemy_balloon_plane_ = Plane3d(enemy_balloon_+0.5*defensive_direction_, defensive_direction_);
 	n_quads_ = 0;
 	n_enemies_ = 0;
 }
@@ -241,16 +247,26 @@ void TeamStrategy::UpdateOffensive(const std::set<QuadData>::iterator &it) {
 		// Vector from quad to enemy balloon
 		double dist;
 		enemy_balloon_plane_.DistancePoint2Plane(pos, &dist);
-		if(dist < 0) {  // dist < 0 imples quad beyond balloon
+		if(dist < 0) {  // dist < 0 imples quad beyond balloon plane
 			it->role.AttackState.State = it->role.AttackState.BALLOON;
 			balloon_targeted_ = true;
 		}
 	}
 
-	// If pops the balloon, go to returning mode
+	// If reaches the balloon, hover there for a while
 	if(it->role.AttackState.State == it->role.AttackState.BALLOON) {
 		Eigen::Vector3d pos = it->quad_state.position;
-		if((enemy_balloon_ - pos).norm() < 0.1) {  // Balloon probably popped
+		if((enemy_balloon_ - pos).norm() < 0.1) {  // close to balloon
+			it->role.AttackState.State = it->role.AttackState.BALLOON_HOVER;
+			balloon_popped_ = true;
+			it->role.AttackState.state_init_time = ros::Time::now();
+		}
+	}
+
+	if(it->role.AttackState.State == it->role.AttackState.BALLOON_HOVER) {
+		// Eigen::Vector3d pos = it->quad_state.position;
+		ros::Duration duration = ros::Time::now() - it->role.AttackState.state_init_time;
+		if(duration.toSec() > 1.0) {  // Balloon probably popped
 			it->role.AttackState.State = it->role.AttackState.RETURNING;
 			balloon_popped_ = true;
 		}
@@ -414,16 +430,25 @@ void TeamStrategy::OffensiveAdvance(const std::set<QuadData>::iterator &it,
 
 void TeamStrategy::OffensiveBalloon(const std::set<QuadData>::iterator &it,
 	                                const double &dt) {
-	double kd = 2.0, kp = 3.0;
+	double kd = 2.0;
 
-	// Get position
+	// Get current position/velocity of vehicle
 	Eigen::Vector3d pos = it->quad_state.position;
+	Eigen::Vector3d vel = it->quad_state.velocity;
+    
+    // Vector from quad to balloon
+	Eigen::Vector3d vec_quad2balloon = (enemy_balloon_ - pos);
 	
-	// Reference position: enemy balloon
-	Eigen::Vector3d ref_pos = enemy_balloon_;
-
-	// Set rk4 reference to balloon
-	it->reference_integrator.ResetStates(ref_pos);
+	// References leading to initial position
+	if (vec_quad2balloon.norm() > max_acc_/kd) {
+		Eigen::Vector3d ref_vel = max_vel_*vec_quad2balloon.normalized();
+		Eigen::Vector3d ref_acc = kd*(ref_vel - vel);
+		it->reference_integrator.SetPos(pos);
+		it->reference_integrator.UpdateStates(ref_acc, dt);
+	} else {
+		Eigen::Vector3d ref_pos = enemy_balloon_;
+		it->reference_integrator.ResetStates(ref_pos);
+	}
 
 	it->reference = this->GetRefRk4(it, dt);
 }
