@@ -258,7 +258,6 @@ void TeamStrategy::UpdateOffensive(const std::set<QuadData>::iterator &it) {
 		Eigen::Vector3d pos = it->quad_state.position;
 		if((enemy_balloon_ - pos).norm() < 0.1) {  // close to balloon
 			it->role.AttackState.State = it->role.AttackState.BALLOON_HOVER;
-			balloon_popped_ = true;
 			it->role.AttackState.state_init_time = ros::Time::now();
 		}
 	}
@@ -301,11 +300,12 @@ void TeamStrategy::UpdateDefensive(const std::set<QuadData>::iterator &it) {
 		}
 	}
  
-	// If targeting an enemy, track him until enemy is no longer dangerous
+	// If targeting an enemy, track him until enemy is no longer dangerous 
+	// (or if enemy balloon is popped)
 	if(it->role.DefenseState.State == it->role.DefenseState.TARGETING) {
 		std::set<EnemyData>::iterator it_target;
 		FindEnemyIndex(it->role.DefenseState.target_name, &it_target);
-		if (it_target->danger.State == it_target->danger.NEUTRAL) {
+		if ((it_target->danger.State == it_target->danger.NEUTRAL) || balloon_popped_) {
 			it->role.DefenseState.State = it->role.DefenseState.RETURNING;
 			it->role.DefenseState.target_name = "";
 			it_target->targeted = false;
