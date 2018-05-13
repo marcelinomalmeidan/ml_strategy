@@ -484,7 +484,7 @@ void TeamStrategy::DefensiveTargeting(const std::set<QuadData>::iterator &it,
 	Eigen::Vector3d pos_projection;  // Enemy projection onto plane
 	double dist;					 // Enemy distance to plane
 	defense_plane.ProjectPointOntoPlane(pos_target, &pos_projection, &dist);
-	pos_projection = pos_projection - Eigen::Vector3d(0.0, 0.0, -0.2);
+	pos_projection = pos_projection + Eigen::Vector3d(0.0, 0.0, -0.3);
 
 	// Project enemy velocity onto plane
 	Eigen::Vector3d vel_projection;
